@@ -1,0 +1,52 @@
+//
+//  main.c
+//  SqLiteExamples
+//
+//  Created by Ann on 15.03.17.
+//  Copyright © 2017 Ann. All rights reserved.
+//
+
+#include <sqlite3.h>
+#include <stdio.h>
+
+int main(void) {
+    
+    sqlite3 *db;
+    sqlite3_stmt *res;
+    
+    int rc = sqlite3_open("test.db", &db);
+    
+    if (rc != SQLITE_OK) {
+        
+        fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
+        
+        return 1;
+    }
+    
+    char *sql = "SELECT Id, Name FROM Cars WHERE Id = ?";
+    
+    rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
+    
+    if (rc == SQLITE_OK) {
+        
+        sqlite3_bind_int(res, 1, 3);
+    } else {
+        
+        fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(db));
+    }
+    
+    int step = sqlite3_step(res);
+    
+    if (step == SQLITE_ROW) {
+        
+        printf("%s: ", sqlite3_column_text(res, 0));
+        printf("%s\n", sqlite3_column_text(res, 1));
+        
+    }
+    
+    sqlite3_finalize(res);
+    sqlite3_close(db);
+    
+    return 0;
+}
