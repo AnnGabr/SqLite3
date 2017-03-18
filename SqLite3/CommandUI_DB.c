@@ -9,6 +9,7 @@
 #include <sqlite3.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdLib.h>
 
 static void ScanfNameAndSurname(char* name, char* surname){
     printf("Enter employee name\n");
@@ -88,6 +89,75 @@ void SelectRecordsByField(sqlite3 *db){
     }
 }
 
+int GetImgData(char **imgData){
+    char imgName[50];
+    printf("Enter img name:\n");
+    scanf("%s", imgName);
+    getchar();
+    
+    FILE *fp = fopen(imgName, "rb");
+    
+    if (fp == NULL) {
+        fprintf(stderr, "Cannot open image file\n");
+        return -1;
+    }
+    
+    fseek(fp, 0, SEEK_END);
+    
+    if (ferror(fp)) {
+        fprintf(stderr, "fseek() failed\n");
+        int r = fclose(fp);
+        if (r == EOF) {
+            fprintf(stderr, "Cannot close file handler\n");
+        }
+        return -1;
+    }
+    
+    long flen = ftell(fp);
+    
+    if (flen == -1) {
+        perror("error occurred");
+        int r = fclose(fp);
+        
+        if (r == EOF) {
+            fprintf(stderr, "Cannot close file handler\n");
+        }
+        return -1;
+    }
+    
+    fseek(fp, 0, SEEK_SET);
+    
+    if (ferror(fp)) {
+        fprintf(stderr, "fseek() failed\n");
+        int r = fclose(fp);
+        
+        if (r == EOF) {
+            fprintf(stderr, "Cannot close file handler\n");
+        }
+        return -1;
+    }
+    
+    *imgData = (char*)malloc((int)(flen + 1));
+    
+    long size = fread(*imgData, 1, flen, fp);
+    
+    if (ferror(fp)) {
+        fprintf(stderr, "fread() failed\n");
+        int r = fclose(fp);
+        if (r == EOF) {
+            fprintf(stderr, "Cannot close file handler\n");
+        }
+        return -1;
+    }
+    
+    int r = fclose(fp);
+    if (r == EOF) {
+        fprintf(stderr, "Cannot close file handler\n");
+    }
+    
+    return (int)size;
+}
+
 void InsertRecordToDB(sqlite3 *db){
     char *sql;
     char source[9][40];
@@ -95,8 +165,8 @@ void InsertRecordToDB(sqlite3 *db){
     GetDataToInsert(source);
     
     sql = "INSERT INTO employees (first_name,last_name, "
-    "birth_date, country, city, address, department, position, hired_date)"
-    "values (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    "birth_date, country, city, address, department, position, hired_date, photo)"
+    "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     
     sqlite3_stmt *pStmt;
     int rc = sqlite3_prepare_v2(db, sql, -1, &pStmt, 0);
@@ -109,7 +179,16 @@ void InsertRecordToDB(sqlite3 *db){
         sqlite3_bind_text(pStmt, i, source[i - 1], \
                           (int)strlen(source[i - 1]), 0);
     
+    char* data;
+    int size = GetImgData(&data);
+    if(size == 0)
+        printf("Warning, no img in file");
+    sqlite3_bind_blob(pStmt, 10, data, (int)size, SQLITE_STATIC);
+    
     rc = sqlite3_step(pStmt);
+    if (rc != SQLITE_DONE) {
+        printf("execution failed: %s", sqlite3_errmsg(db));
+    }
     
     rc = sqlite3_finalize(pStmt);
 }
@@ -174,6 +253,9 @@ void DeleteRecordFromDB(sqlite3 *db, char* name, char* surname){
     sqlite3_bind_text(pStmt, 2, surname, (int)strlen(surname), 0);
     
     rc = sqlite3_step(pStmt);
+    if (rc != SQLITE_DONE) {
+        printf("execution failed: %s", sqlite3_errmsg(db));
+    }
     
     rc = sqlite3_finalize(pStmt);
 }
